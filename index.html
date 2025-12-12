@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Temperatura ESP32 BLE</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 30px;
+        }
+
+        /* --- Secciones Generales --- */
+        .seccion-control, .seccion-sensores, .seccion-actuadores, .seccion-conexion {
+            margin-bottom: 25px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        /* Estilo para la nueva sección de conexión */
+        .seccion-conexion {
+            text-align: center;
+            background-color: #e6f7ff;
+            border-color: #91d5ff;
+        }
+
+        #btn-conectar {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        #btn-conectar:hover {
+            background-color: #0056b3;
+        }
+        
+        .estado-conexion {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+
+        h2 {
+            color: #28a745;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* --- Sensores y Termómetros --- */
+        .grid-sensores {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 20px;
+            text-align: center;
+        }
+
+        .sensor-display {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .sensor-valor {
+            font-size: 2em;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 10px;
+        }
+
+        /* Termómetro Gráfico (CSS) */
+        .termometro {
+            width: 30px;
+            height: 120px;
+            background-color: #ccc;
+            border: 1px solid #999;
+            border-radius: 15px;
+            margin: 10px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .termometro-nivel {
+            width: 100%;
+            background-color: #dc3545; 
+            position: absolute;
+            bottom: 0;
+            transition: height 0.5s ease-in-out;
+        }
+        
+        .promedio-display .sensor-valor {
+             color: #007bff;
+        }
+
+        .promedio-display .termometro-nivel {
+             background-color: #007bff; 
+        }
+
+        /* --- Control (Manual/Automático) --- */
+        .modo-control {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .modo-control button {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #btn-auto { background-color: #28a745; color: white; }
+        #btn-manual { background-color: #ffc107; color: #333; }
+
+        .modo-activo {
+            box-shadow: 0 0 10px 3px rgba(40, 167, 69, 0.5); 
+            border: 3px solid #1e7e34;
+            font-weight: bold;
+        }
+
+        /* --- Actuadores (Ventilador/Calefacción) --- */
+        .actuadores-grid {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .actuador-card {
+            padding: 20px;
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            width: 45%;
+        }
+
+        .actuador-estado {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #dc3545;
+        }
+
+        .actuador-on { color: #28a745 !important; }
+        .actuador-off { color: #dc3545 !important; }
+
+        .actuador-card button {
+            padding: 8px 15px;
+            font-size: 0.9em;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100px;
+        }
+
+        #btn-vent-on { background-color: #17a2b8; color: white; }
+        #btn-vent-off { background-color: #6c757d; color: white; }
+        #btn-calef-on { background-color: #ff6347; color: white; }
+        #btn-calef-off { background-color: #6c757d; color: white; }
+
+        /* Deshabilitar botones en modo automático y desconectado */
+        .actuador-card.disabled button {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sistema de Control de Temperatura ESP32 BLE</h1>
+        
+        <div class="seccion-conexion">
+            <h2>🔗 Conexión ESP32</h2>
+            <button id="btn-conectar" onclick="conectarBluetooth()">Conectar ESP32 (Bluetooth)</button>
+            <p class="estado-conexion">Estado: <span id="estado-ble" style="color: red;">Desconectado</span></p>
+            <p style="font-size: 0.8em; color: #666;">*Esta función requiere navegadores compatibles con Web Bluetooth (Ej: Chrome).</p>
+        </div>
+
+        <div class="seccion-control">
+            <h2>⚙️ Modo de Operación</h2>
+            <div class="modo-control">
+                <button id="btn-auto" onclick="setModo('auto')" class="modo-activo">Automático</button>
+                <button id="btn-manual" onclick="promptPassword()">Manual</button>
+            </div>
+            <p style="text-align: center; margin-top: 15px;">**Modo Actual:** <span id="modo-actual" style="font-weight: bold; color: #007bff;">Automático</span></p>
+        </div>
+
+        <div class="seccion-sensores">
+            <h2>🌡️ Lecturas de Sensores Dallas</h2>
+            <div class="grid-sensores">
+                <div class="sensor-display">
+                    <h3>Sensor 1</h3>
+                    <div class="sensor-valor" id="temp-s1">--</div>
+                    <div class="termometro" id="term-s1"><div class="termometro-nivel"></div></div>
+                    <p>°C</p>
+                </div>
+                <div class="sensor-display">
+                    <h3>Sensor 2</h3>
+                    <div class="sensor-valor" id="temp-s2">--</div>
+                    <div class="termometro" id="term-s2"><div class="termometro-nivel"></div></div>
+                    <p>°C</p>
+                </div>
+                <div class="sensor-display">
+                    <h3>Sensor 3</h3>
+                    <div class="sensor-valor" id="temp-s3">--</div>
+                    <div class="termometro" id="term-s3"><div class="termometro-nivel"></div></div>
+                    <p>°C</p>
+                </div>
+                <div class="sensor-display">
+                    <h3>Sensor 4</h3>
+                    <div class="sensor-valor" id="temp-s4">--</div>
+                    <div class="termometro" id="term-s4"><div class="termometro-nivel"></div></div>
+                    <p>°C</p>
+                </div>
+                 <div class="sensor-display promedio-display">
+                    <h3>Promedio Gral.</h3>
+                    <div class="sensor-valor" id="temp-promedio">--</div>
+                    <div class="termometro" id="term-promedio"><div class="termometro-nivel"></div></div>
+                    <p>°C</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="seccion-actuadores">
+            <h2>💡 Control de Actuadores (Manual)</h2>
+            <div class="actuadores-grid">
+                <div class="actuador-card disabled" id="card-ventilador">
+                    <h3>Ventilador</h3>
+                    <div class="actuador-estado act-off" id="estado-ventilador">APAGADO</div>
+                    <button id="btn-vent-on" onclick="setActuador('ventilador', true)">ENCENDER</button>
+                    <button id="btn-vent-off" onclick="setActuador('ventilador', false)">APAGAR</button>
+                </div>
+
+                <div class="actuador-card disabled" id="card-calefaccion">
+                    <h3>Calefacción</h3>
+                    <div class="actuador-estado act-off" id="estado-calefaccion">APAGADA</div>
+                    <button id="btn-calef-on" onclick="setActuador('calefaccion', true)">ENCENDER</button>
+                    <button id="btn-calef-off" onclick="setActuador('calefaccion', false)">APAGAR</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+  
